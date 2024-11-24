@@ -24,7 +24,6 @@ import requests
 load_dotenv()
 user = os.getenv("USER")
 password = os.getenv("PASSWORD")
-user_database = os.getenv("USER_DATABASE")
 patient_database = os.getenv("DATABASE")
 # Initialize Flask app
 app = Flask(__name__)
@@ -61,7 +60,11 @@ def close_db(exception):
 def token_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        token = request.headers.get("Authorization").split(" ")[1]
+        try:
+            token = request.headers.get("Authorization").split(" ")[1]
+        except Exception as e:
+            token = request.headers.get("Authorization")
+            print("token=",token)
         if not token:
             return jsonify({"message": "Token is missing"}), 403
         try:
@@ -76,6 +79,7 @@ def token_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
 
 # Root route
 @app.route("/")
@@ -142,16 +146,17 @@ def login():
     # If credentials are incorrect, return an error
     return jsonify({"message": "Invalid credentials"}), 401
 
-@app.route('/data', methods=["GET","POST"])
+
+@app.route("/data", methods=["GET", "POST"])
 @token_required  # Ensure only authenticated users can access this data
 def get_data():
     db = get_db()
     cursor = db.cursor(dictionary=True)
-    
+
     try:
         cursor.execute("SELECT * FROM health_info")
         results = cursor.fetchall()
-        
+
         print(jsonify(results))
         return jsonify(results)  # Send the data as JSON
     except Exception as e:
@@ -159,6 +164,56 @@ def get_data():
     finally:
         cursor.close()
 
+@app.route("/data/<int:id>", methods=["GET", "POST"])
+@token_required  # Ensure only authenticated users can access this data
+def get_data_by_id(id):
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+
+    # Handle GET request: Retrieve data for a specific ID
+    if request.method == "GET":
+        try:
+            cursor.execute("SELECT * FROM health_info WHERE id = %s", (id,))
+            result = cursor.fetchone()
+
+            if result:
+                return jsonify(result), 200  # Return the record if found
+            else:
+                return jsonify({"message": "Data not found"}), 404
+
+        except Exception as e:
+            return jsonify({"message": "Error fetching data", "error": str(e)}), 500
+
+    # Handle POST request: Update data for a specific ID
+    if request.method == "POST":
+        try:
+            # Extract the updated data from the request
+            data = request.get_json()
+
+            # You can add validation for the incoming data if necessary
+            if not all(key in data for key in ["health_info", "other_field"]):  # Replace with actual fields
+                return jsonify({"message": "Missing required fields"}), 400
+
+            # Example query to update the health_info record
+            cursor.execute(
+                """
+                UPDATE health_info
+                SET health_info = %s, other_field = %s  # Replace with actual fields
+                WHERE id = %s
+                """,
+                (data["health_info"], data["other_field"], id),
+            )
+            db.commit()
+
+            if cursor.rowcount > 0:
+                return jsonify({"message": "Data updated successfully"}), 200
+            else:
+                return jsonify({"message": "No changes made"}), 400
+
+        except Exception as e:
+            return jsonify({"message": "Error updating data", "error": str(e)}), 500
+
+    return jsonify({"message": "Method Not Allowed"}), 405
 
 
 # Run the Flask app
