@@ -61,13 +61,14 @@ def close_db(exception):
 def token_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        token = request.headers.get("Authorization")
+        token = request.headers.get("Authorization").split(" ")[1]
         if not token:
             return jsonify({"message": "Token is missing"}), 403
         try:
             data = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
             g.user_id = data["user_id"]
             g.role = data["role"]
+            print(g.user_id, g.role)
         except jwt.ExpiredSignatureError:
             return jsonify({"message": "Token has expired"}), 403
         except jwt.InvalidTokenError:
@@ -144,7 +145,6 @@ def login():
 @app.route('/data', methods=["GET","POST"])
 @token_required  # Ensure only authenticated users can access this data
 def get_data():
-    print("GET DATA")
     db = get_db()
     cursor = db.cursor(dictionary=True)
     
