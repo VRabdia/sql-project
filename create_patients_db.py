@@ -1,20 +1,21 @@
 import mysql.connector
-import bcrypt
 import random
 import os
 from dotenv import load_dotenv
 
-
+# Load environment variables from .env file
 load_dotenv()
-user=os.getenv("USER")
-password=os.getenv("PASSWORD")
-host=os.getenv("HOST")
-database=os.getenv("DATABASE")
+
+# Get environment variables for database connection
+user = os.getenv("USER")
+password = os.getenv("PASSWORD")
+host = os.getenv("HOST")
+database = os.getenv("DATABASE")
 
 # Predefined lists of names, genders, health history, etc.
 first_names = ['John', 'Jane', 'Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Hank']
 last_names = ['Smith', 'Doe', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Wilson']
-genders = [True, False]  # True for male, False for female (or other representations)
+genders = ["Male", "Female"]
 ages = list(range(18, 80))  # Age range from 18 to 79
 weights = [random.uniform(50, 120) for _ in range(100)]  # Random weights between 50 and 120 kg
 heights = [random.uniform(150, 200) for _ in range(100)]  # Random heights between 150 cm and 200 cm
@@ -31,25 +32,74 @@ health_histories = [
     "No significant health history"
 ]
 
-# Establish MySQL connection
-conn = mysql.connector.connect(user=user, password=password, database=database)
-cursor = conn.cursor()
-
-# Populate health_info table with random values
-for i in range(100):
-    first_name = random.choice(first_names)  # Randomly select a first name
-    last_name = random.choice(last_names)    # Randomly select a last name
-    gender = random.choice(genders)          # Randomly select gender (True or False)
-    age = random.choice(ages)                # Randomly select age from the predefined range
-    weight = random.choice(weights)          # Randomly select weight from the list
-    height = random.choice(heights)          # Randomly select height from the list
-    health_history = random.choice(health_histories)  # Randomly select a health history
-
-    cursor.execute(
-        "INSERT INTO health_info (first_name, last_name, gender, age, weight, height, health_history) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-        (first_name, last_name, gender, age, weight, height, health_history)
+# Function to connect to the database
+def get_db():
+    return mysql.connector.connect(
+        user=user,
+        password=password,
+        host=host,
+        database=database,
     )
 
-# Commit changes and close connection
-conn.commit()
-conn.close()
+# Function to create the database if it doesn't exist
+def create_database():
+    db = mysql.connector.connect(
+        user=user,
+        password=password,
+        host=host
+    )
+    cursor = db.cursor()
+    cursor.execute(f"CREATE DATABASE IF NOT EXISTS {database}")
+    db.close()
+
+# Function to create the health_info table if it doesn't exist
+def create_table():
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS health_info (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            first_name VARCHAR(255) NOT NULL,
+            last_name VARCHAR(255) NOT NULL,
+            gender VARCHAR(255) NOT NULL,
+            age INT NOT NULL,
+            weight FLOAT NOT NULL,
+            height FLOAT NOT NULL,
+            health_history VARCHAR(255) NOT NULL
+        )
+        """
+    )
+    db.close()
+
+# Function to populate the health_info table with random data
+def insert_health_data():
+    db = get_db()
+    cursor = db.cursor()
+
+    # Populate health_info table with random values
+    for i in range(100):
+        first_name = random.choice(first_names)
+        last_name = random.choice(last_names)
+        gender = random.choice(genders)
+        age = random.choice(ages)
+        weight = random.choice(weights)
+        height = random.choice(heights)
+        health_history = random.choice(health_histories)
+
+        cursor.execute(
+            "INSERT INTO health_info (first_name, last_name, gender, age, weight, height, health_history) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (first_name, last_name, gender, age, weight, height, health_history)
+        )
+
+    db.commit()
+    db.close()
+
+# Main function to create database, table, and insert data
+def main():
+    create_database()  # Create database if it doesn't exist
+    create_table()  # Create table if it doesn't exist
+    insert_health_data()  # Insert random health data into the table
+
+if __name__ == "__main__":
+    main()

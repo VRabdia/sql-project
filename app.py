@@ -18,6 +18,8 @@ import time
 import os
 from dotenv import load_dotenv
 from flask_cors import CORS
+import requests
+
 
 load_dotenv()
 user = os.getenv("USER")
@@ -100,12 +102,10 @@ def dashboard():
         return jsonify({"message": "Token is missing"}), 403
 
     # Render the appropriate template based on user role
-    if g.role == "H":
-        return render_template("data_h.html", user_id=g.user_id)
-    elif g.role == "R":
-        return render_template("data_r.html", user_id=g.user_id)
-    else:
-        return jsonify({"message": "Unauthorized role"}), 403
+    templates = {"H": "data_h.html", "R": "data_r.html"}
+    if g.role in templates:
+        return render_template(templates[g.role], user_id=g.user_id)
+    return jsonify({"message": "Unauthorized role"}), 403
 
 
 # User Authentication: Login Route
@@ -141,10 +141,10 @@ def login():
     # If credentials are incorrect, return an error
     return jsonify({"message": "Invalid credentials"}), 401
 
-@app.route('/data', methods=["GET"])
-# @token_required  # Ensure only authenticated users can access this data
+@app.route('/data', methods=["GET","POST"])
+@token_required  # Ensure only authenticated users can access this data
 def get_data():
-    print("GET DATA//////////////////////////////////////////")
+    print("GET DATA")
     db = get_db()
     cursor = db.cursor(dictionary=True)
     
@@ -152,17 +152,14 @@ def get_data():
         cursor.execute("SELECT * FROM health_info")
         results = cursor.fetchall()
         
-        # # Decrypt sensitive fields before sending data
-        # for record in results:
-        #     record['gender'] = cipher.decrypt(record['gender'].encode()).decode()
-        #     record['age'] = cipher.decrypt(record['age'].encode()).decode()
-        
         print(jsonify(results))
         return jsonify(results)  # Send the data as JSON
     except Exception as e:
         return jsonify({"message": "Error fetching data", "error": str(e)}), 500
     finally:
         cursor.close()
+
+
 
 # Run the Flask app
 if __name__ == "__main__":
